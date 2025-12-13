@@ -1,6 +1,7 @@
 import pydivert
 import time
 import threading
+import traceback
 
 class BandwidthLimiter:
     def __init__(self):
@@ -53,8 +54,25 @@ class BandwidthLimiter:
         # Filter: Capture all traffic (true). "ip" might be ambiguous or limited on some systems.
         # priority=0 by default.
         try:
-            with pydivert.WinDivert("true") as w:
-                for packet in w:
+            # recv_bufsize=65535 to standard MTU limit to prevent WinError 87 on large packets
+            with pydivert.WinDivert(filter="true") as w: # Filter moved to named arg for clarity
+                # Manually handle buffer size via recv() if needed, but pydivert usually handles it if we don't pass it?
+                # Wait, pydivert constructor does NOT take bufsize. 
+                # Research said use w.recv(65535) method instead of iterator.
+                # So I must change `for packet in w:` to a while loop with w.recv().
+                
+                while not self._stop_event.is_set():
+                    try:
+                        packet = w.recv(bufsize=65535) # Catch large packets
+                    except Exception as e:
+                        # Timeout or other error during recv
+                        # But wait, does it timeout? default timeout is infinite?
+                        # WinError 87 might happen here if buffer too small.
+                        if "87" in str(e): 
+                             print("WinDivert recv error 87 (packet too big?)")
+                             continue
+                        raise e
+
                     if self._stop_event.is_set():
                         w.send(packet)
                         break
@@ -125,4 +143,5 @@ class BandwidthLimiter:
                         # Actually _refill_bucket relies on system time, so checking next time it will work.
 
         except Exception as e:
+            traceback.print_exc()
             print(f"Error in traffic shaper: {e}")

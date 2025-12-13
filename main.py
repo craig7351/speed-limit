@@ -1,8 +1,10 @@
 import sys
 import ctypes
+import traceback
 import tkinter as tk
 from tkinter import messagebox
-from traffic_shaper import BandwidthLimiter
+# Delayed import to allow admin check and error trapping
+# from traffic_shaper import BandwidthLimiter 
 
 def is_admin():
     try:
@@ -15,6 +17,7 @@ def check_admin():
     if not is_admin():
         # Re-run the program with admin rights
         try:
+            # sys.argv[0] is the script name
             ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to elevate privileges: {e}")
@@ -26,6 +29,8 @@ class App:
         self.root.title("Windows 11 Global Bandwidth Limiter")
         self.root.geometry("400x250")
         
+        # Import here to catch errors if module is broken
+        from traffic_shaper import BandwidthLimiter
         self.limiter = BandwidthLimiter()
         self.is_running = False
 
@@ -77,7 +82,8 @@ class App:
                 self.entry_dl.config(state='disabled')
                 self.entry_ul.config(state='disabled')
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to start limiter: {e}\n\nMake sure WinDivert driver is supported.")
+                traceback.print_exc()
+                messagebox.showerror("Error", f"Failed to start limiter: {e}\n\nSee console for details.")
         else:
             # Stop
             self.limiter.stop()
@@ -96,7 +102,13 @@ class App:
         sys.exit()
 
 if __name__ == "__main__":
-    check_admin()
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
+    try:
+        check_admin()
+        root = tk.Tk()
+        app = App(root)
+        root.mainloop()
+    except Exception:
+        traceback.print_exc()
+        print("\nCRITICAL ERROR OCCURRED.")
+        input("Press Enter to close window...")
+        sys.exit(1)
