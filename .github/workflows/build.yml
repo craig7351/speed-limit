@@ -58,4 +58,4 @@ jobs:
       with:
         files: dist/SpeedLimit.exe
         generate_release_notes: true
-      token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
